@@ -1,0 +1,8 @@
+module nghttp2 {
+    header "nghttp2/nghttp2.h"
+    header "nghttp2/nghttp2ver.h"
+    header "nghttp2_callbacks.h"
+    header "nghttp2_session.h"
+    link "nghttp2"
+    export *
+}

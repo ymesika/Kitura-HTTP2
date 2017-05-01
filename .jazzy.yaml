@@ -1,0 +1,15 @@
+module: KituraHTTP2
+author: IBM
+github_url: https://github.com/IBM-Swift/Kitura-HTTP2/
+
+theme: fullwidth
+clean: true
+exclude: [Packages]
+
+readme: README.md
+
+skip_undocumented: false
+hide_documentation_coverage: false
+
+xcodebuild_arguments: [-project, Kitura-HTTP2.xcodeproj, -target, KituraHTTP2, LIBRARY_SEARCH_PATHS=.build/debug]
+
