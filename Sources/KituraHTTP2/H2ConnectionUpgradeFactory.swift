@@ -16,7 +16,6 @@
 
 import Foundation
 import KituraNet
-import nghttp2
 import LoggerAPI
 
 
@@ -45,7 +44,10 @@ public class H2ConnectionUpgradeFactory: ConnectionUpgradeFactory {
         
         response.statusCode = .switchingProtocols
         
-        let processor = H2CSocketProcessor(settingsPayload: decodedSettings, handler: handler)
+        let session = Http2Session(settingsPayload: decodedSettings)
+        let processor = H2CSocketProcessor(session: session)
+        session.processor = processor
+        
         return (processor, nil)
     }
     
