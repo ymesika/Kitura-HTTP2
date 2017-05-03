@@ -2,7 +2,6 @@ import Kitura
 
 // Create a new router
 let router = Router()
-let http2 = HTTP2()
 
 // Handle HTTP GET requests to /
 router.get("/") {

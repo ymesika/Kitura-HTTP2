@@ -14,13 +14,6 @@
  * limitations under the License.
  */
 
-import KituraNet
+/// Register the HTTP2 connection upgrade factory
+private let factory = H2ConnectionUpgradeFactory()
 
-/// Main class for the Kitura-HTTP2 API.
-public class HTTP2 {
-    private static let factory = H2ConnectionUpgradeFactory()
-    
-    init() {
-        let _ = HTTP2.factory.name
-    }
-}
