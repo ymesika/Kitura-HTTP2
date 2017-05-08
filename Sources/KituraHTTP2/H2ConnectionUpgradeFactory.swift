@@ -38,7 +38,7 @@ public class H2ConnectionUpgradeFactory: ConnectionUpgradeFactory {
             return (nil, "Upgrade request MUST include exactly one 'HTTP2-Settings' header field.")
         }
         
-        guard let decodedSettings =  Data(base64Encoded: base64urlToBase64(base64url: settings[0])) else {
+        guard let decodedSettings =  Data(base64Encoded: HTTP2Utils.base64urlToBase64(base64url: settings[0])) else {
             return (nil, "Value for 'HTTP2-Settings' is not Base64 URL encoded")
         }
         
@@ -49,15 +49,5 @@ public class H2ConnectionUpgradeFactory: ConnectionUpgradeFactory {
         session.processor = processor
         
         return (processor, nil)
-    }
-    
-    private func base64urlToBase64(base64url: String) -> String {
-        var base64 = base64url
-            .replacingOccurrences(of: "-", with: "+")
-            .replacingOccurrences(of: "_", with: "/")
-        if base64.characters.count % 4 != 0 {
-            base64.append(String(repeating: "=", count: 4 - base64.characters.count % 4))
-        }
-        return base64
     }
 }
