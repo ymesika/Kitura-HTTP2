@@ -27,10 +27,16 @@ class HTTP2ServerResponse: ServerResponse {
     /// The headers to send back as part of the HTTP response.
     var headers = HeadersContainer()
     
+    /// Hold the header names and values
     var headersStrings = [[UInt8]]()
+    
+    /// Aggregate the written data into this data object
     var frameData: Data? = nil
     
+    /// The session object for sending the reponse
     let http2Session: Http2Session
+    
+    /// The stream ID to send the response to
     let stream: Int32
     
     init(session: Http2Session, streamId: Int32) {
@@ -57,7 +63,6 @@ class HTTP2ServerResponse: ServerResponse {
     ///
     /// - Throws: Socket.error if an error occurred while writing to the socket
     func write(from data: Data) throws {
-        //http2Session.sendData(streamId: stream, data: data, headers: nghttp2Headers())
         if frameData == nil {
             frameData = Data()
         }
@@ -79,7 +84,8 @@ class HTTP2ServerResponse: ServerResponse {
     /// - Throws: Socket.error if an error occurred while writing to a socket
     func end() throws {
         if let data = frameData {
-            http2Session.sendData(streamId: stream, data: data, headers: nghttp2Headers())
+            let frameHeaders = nghttp2Headers()
+            http2Session.sendData(streamId: stream, data: data, headers: frameHeaders)
         }
     }
     
@@ -91,7 +97,10 @@ class HTTP2ServerResponse: ServerResponse {
         headersStrings.removeAll()
     }
     
+    /// Convert the HeadersContainer into nghttp2 name-value array as requested by its api
     private func nghttp2Headers() -> [nghttp2_nv] {
+        
+        // Add the :status header with the value from the statusCode field
         var http2Headers = [nghttp2_nv]()
         let nvName: [UInt8] = Array(":status".utf8)
         headersStrings.append(nvName)
@@ -99,6 +108,7 @@ class HTTP2ServerResponse: ServerResponse {
         headersStrings.append(nvValue)
         http2Headers.append(nghttp2_nv(name: &headersStrings[0], value: &headersStrings[1], namelen: headersStrings[0].count, valuelen: headersStrings[1].count, flags: UInt8(NGHTTP2_NV_FLAG_NONE.rawValue)))
     
+        // Add the rest of the headers from the headers field
         var counter = 2
         for (_, header) in headers.enumerated() {
             if let firstValue = header.value.first {
