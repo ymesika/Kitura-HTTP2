@@ -29,7 +29,9 @@ class H2CSocketProcessor: IncomingSocketProcessor {
     
     public weak var handler: IncomingSocketHandler? {
         didSet{
-            http2Session?.sendInitialFrames()
+            if handler != nil {
+                http2Session?.sendInitialFrames()
+            }
         }
     }
     
