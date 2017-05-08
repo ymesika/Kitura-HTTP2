@@ -17,6 +17,7 @@
 import Foundation
 import nghttp2
 import LoggerAPI
+import KituraNet
 
 struct StreamData {
     var streamId: Int32
@@ -26,13 +27,19 @@ struct StreamData {
 class Http2Session {
     
     weak var processor: H2CSocketProcessor? = nil
+    var initialRequest: HTTP2ServerRequest?
     var session: UnsafeMutablePointer<nghttp2_session>? = nil
     var streamsData = [Int32: StreamData]()
     var nghttp2UserData: Http2Session!
     
-    init(settingsPayload: Data) {
+    init(settingsPayload: Data, with serverRequest: ServerRequest? = nil) {
         nghttp2UserData = self
         session = initNGHttp2Session()
+        
+        if let serverRequest = serverRequest {
+            initialRequest = HTTP2ServerRequest(request: serverRequest)
+        }
+        
         nghttp2_session_upgrade2(session, [UInt8](settingsPayload), settingsPayload.count, 0, nil)
     }
     
@@ -41,8 +48,11 @@ class Http2Session {
             print("Failed to send upgrade response header")
         }
         
-        var data: [UInt8] = Array("<html><head><title>Success</title></head><body><h1>It Worked!</h1></body><//html>".utf8)
-        let _ = sendData(streamId: 1, data: &data, length: data.count)
+        if let request = initialRequest {
+            //Data frame for an upgrade request will be returned on stream 1
+            let response = HTTP2ServerResponse(session: self, streamId: 1)
+            HTTP2.delegate?.handle(request: request, response: response)
+        }
     }
     
     public func close() {
@@ -164,11 +174,12 @@ class Http2Session {
         return sessionSend()
     }
     
-    private func sendData(streamId: Int32, data: UnsafeMutableRawPointer, length: Int) -> Int32 {
-        var nvName: [UInt8] = Array(":status".utf8)
-        var nvValue: [UInt8] = Array("200".utf8)
-        let headers: [nghttp2_nv] = [ nghttp2_nv(name: &nvName, value: &nvValue, namelen: nvName.count, valuelen: nvValue.count, flags: UInt8(NGHTTP2_NV_FLAG_NONE.rawValue)) ]
-        
+    public func sendData(streamId: Int32, data: Data, headers: [nghttp2_nv]) {
+        var mutData: [UInt8] = Array(data)
+        _ = sendData(streamId: streamId, data: &mutData, length: mutData.count, headers: headers)
+    }
+    
+    private func sendData(streamId: Int32, data: UnsafeMutableRawPointer, length: Int, headers: [nghttp2_nv]) -> Int32 {
         let dataSource = nghttp2_data_source(ptr: data)
         let readCallback: @convention(c) (UnsafeMutablePointer<nghttp2_session>?, Int32, UnsafeMutablePointer<UInt8>?, Int, UnsafeMutablePointer<UInt32>?, UnsafeMutablePointer<nghttp2_data_source>?, UnsafeMutableRawPointer?) -> Int = { (session, streamId, buf, length, dataFlags, source, userData) in
             guard let source = source else {

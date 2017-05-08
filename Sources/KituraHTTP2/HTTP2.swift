@@ -18,9 +18,10 @@ import KituraNet
 
 /// Main class for the Kitura-HTTP2 API.
 public class HTTP2 {
-    private static let factory = H2ConnectionUpgradeFactory()
+    static var delegate: ServerDelegate?
     
-    init() {
-        let _ = HTTP2.factory.name
+    public static func using(serverDelegate: ServerDelegate?) {
+        HTTP2.delegate = serverDelegate
+        _ = H2ConnectionUpgradeFactory()
     }
 }

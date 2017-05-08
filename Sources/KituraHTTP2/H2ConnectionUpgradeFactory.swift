@@ -44,7 +44,7 @@ public class H2ConnectionUpgradeFactory: ConnectionUpgradeFactory {
         
         response.statusCode = .switchingProtocols
         
-        let session = Http2Session(settingsPayload: decodedSettings)
+        let session = Http2Session(settingsPayload: decodedSettings, with: request)
         let processor = H2CSocketProcessor(session: session)
         session.processor = processor
         
