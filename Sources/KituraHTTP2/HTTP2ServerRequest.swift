@@ -68,6 +68,12 @@ class HTTP2ServerRequest: ServerRequest {
     /// The HTTP Method specified in the request
     var method: String = "GET"
     
+    init(url: Data, urlURL: URL, remoteAddress: String) {
+        self.url = url
+        self.urlURL = urlURL
+        self.remoteAddress = remoteAddress
+    }
+    
     init(request: ServerRequest) {
         url = request.url
         urlURL = request.urlURL

@@ -23,5 +23,7 @@ public class HTTP2 {
     public static func using(serverDelegate: ServerDelegate?) {
         HTTP2.delegate = serverDelegate
         _ = H2ConnectionUpgradeFactory()
+        
+        HTTPServer.register(incomingSocketProcessorCreator: H2CSocketProcessorCreator())
     }
 }

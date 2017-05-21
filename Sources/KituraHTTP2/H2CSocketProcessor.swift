@@ -18,6 +18,7 @@ import Foundation
 
 import KituraNet
 import LoggerAPI
+import Socket
 
 class H2CSocketProcessor: IncomingSocketProcessor {
     
@@ -30,15 +31,26 @@ class H2CSocketProcessor: IncomingSocketProcessor {
     public weak var handler: IncomingSocketHandler? {
         didSet{
             if handler != nil {
-                http2Session?.sendInitialFrames()
+                /* Send HTTP/2 client connection header, which includes 24 bytes
+                 magic octets and SETTINGS frame */
+                if (http2Session?.sendServerConnectionHeader() != 0) {
+                    print("Failed to send server connection response header")
+                }
+                
+                if http1Upgrade {
+                    http2Session?.sendInitialRequestData()
+                }
             }
         }
     }
     
     private let http2Session: Http2Session?
     
-    public init(session: Http2Session) {
+    private let http1Upgrade: Bool
+    
+    public init(session: Http2Session, upgrade: Bool) {
         http2Session = session
+        http1Upgrade = upgrade
     }
     
     /// Process data read from the socket.
@@ -59,6 +71,7 @@ class H2CSocketProcessor: IncomingSocketProcessor {
     ///
     /// - Parameter from: An NSData object containing the bytes to be written to the socket.
     public func write(from data: NSData) {
+        Log.debug("Writing \(data.length) bytes")
         handler?.write(from: data)
     }
     
@@ -67,6 +80,7 @@ class H2CSocketProcessor: IncomingSocketProcessor {
     /// - Parameter from: An UnsafeRawPointer to the sequence of bytes to be written to the socket.
     /// - Parameter length: The number of bytes to write to the socket.
     public func write(from bytes: UnsafeRawPointer, length: Int) {
+        Log.debug("Writing \(length) bytes")
         handler?.write(from: bytes, length: length)
     }
     
@@ -78,7 +92,21 @@ class H2CSocketProcessor: IncomingSocketProcessor {
     
     /// Called by the `IncomingSocketHandler` to tell us that the socket has been closed.
     public func socketClosed() {
-        print("Socket closed")
+        Log.debug("Socket closed")
     }
     
 }
+
+class H2CSocketProcessorCreator: IncomingSocketProcessorCreator {
+    public let name = "h2"
+    
+    public func createIncomingSocketProcessor(socket: Socket, using: ServerDelegate) -> IncomingSocketProcessor {
+        print("Creating IncomingSocketProcessor for socket \(socket.socketfd). Remote address: \(socket.remoteHostname)")
+        let session = Http2Session()
+        session.remoteAddress = socket.remoteHostname
+        let processor = H2CSocketProcessor(session: session, upgrade: false)
+        session.processor = processor
+        return processor
+    }
+}
+

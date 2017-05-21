@@ -21,7 +21,16 @@ import KituraNet
 
 struct StreamData {
     var streamId: Int32
-    var dataLengths: [UnsafeMutableRawPointer: Int]
+    var dataLengths = [UnsafeMutableRawPointer: Int]()
+    var headers = HeadersContainer()
+    var requestPath: String?
+    var method: String?
+    var scheme: String?
+    var authority: String?
+    
+    init(streamId: Int32) {
+        self.streamId = streamId
+    }
 }
 
 class Http2Session {
@@ -31,6 +40,12 @@ class Http2Session {
     var session: UnsafeMutablePointer<nghttp2_session>? = nil
     var streamsData = [Int32: StreamData]()
     var nghttp2UserData: Http2Session!
+    var remoteAddress: String?
+    
+    init() {
+        nghttp2UserData = self
+        session = initNGHttp2Session()
+    }
     
     init(settingsPayload: Data, with serverRequest: ServerRequest? = nil) {
         nghttp2UserData = self
@@ -43,11 +58,7 @@ class Http2Session {
         nghttp2_session_upgrade2(session, [UInt8](settingsPayload), settingsPayload.count, 0, nil)
     }
     
-    public func sendInitialFrames() {
-        if (sendSettings() != 0) {
-            print("Failed to send upgrade response header")
-        }
-        
+    public func sendInitialRequestData() {
         if let request = initialRequest {
             //Data frame for an upgrade request will be returned on stream 1
             let response = HTTP2ServerResponse(session: self, streamId: 1)
@@ -85,10 +96,10 @@ class Http2Session {
             if let frame = frame {
                 switch (UInt32(frame.pointee.hd.type)) {
                 case NGHTTP2_DATA.rawValue:
-                    print("Data")
+                    print("Received Frame - Data")
                     fallthrough
                 case NGHTTP2_HEADERS.rawValue:
-                    print("Headers")
+                    print("Received Frame - Headers")
                     /* Check that the client request has finished */
                     if (frame.pointee.hd.flags & UInt8(NGHTTP2_FLAG_END_HEADERS.rawValue)) != 0 {
                         if let userData = userData, let session = userData.load(as: Http2Session.self).session {
@@ -98,17 +109,34 @@ class Http2Session {
                             if streamData == nil {
                                 return 0
                             }
-                            //TODO: Process the request
+                            
+                            let session = userData.load(as: Http2Session.self)
+                            let streamId = frame.pointee.hd.stream_id
+                            if let sData = session.streamsData[streamId], let requestPath = sData.requestPath {
+                                if let urlFromPath = URL(string: requestPath), let pathData = requestPath.data(using: .utf8) {
+                                    let request = HTTP2ServerRequest(url: pathData, urlURL: urlFromPath, remoteAddress: session.remoteAddress ?? "")
+                                    request.method = sData.method ?? "GET"
+                                    for (key, value) in sData.headers {
+                                        request.headers.append(key, value: value)
+                                    }
+                                    let response = HTTP2ServerResponse(session: session, streamId: streamId)
+                                    HTTP2.delegate?.handle(request: request, response: response)
+                                }
+                            }
                         }
                     }
                 case NGHTTP2_SETTINGS.rawValue:
-                    print("Settings")
+                    print("Received Frame - Settings")
+                case NGHTTP2_WINDOW_UPDATE.rawValue:
+                    print("Received Frame - Window Update")
                 case NGHTTP2_PRIORITY.rawValue:
-                    print("Priority")
+                    print("Received Frame - Priority")
+                case NGHTTP2_RST_STREAM.rawValue:
+                    print("Received Frame - Rst Stream (id: \(frame.pointee.hd.stream_id))")
                 case NGHTTP2_GOAWAY.rawValue:
-                    print("Goaway")
+                    print("Received Frame - Goaway")
                 default:
-                    print("Unknown - type:\(frame.pointee.hd.type) streamId:\(frame.pointee.hd.stream_id)")
+                    print("Received Unknown Frame - type:\(frame.pointee.hd.type) streamId:\(frame.pointee.hd.stream_id)")
                 }
             }
             return 0
@@ -123,10 +151,53 @@ class Http2Session {
         nghttp2_session_callbacks_set_on_stream_close_callback(callbacks, onStreamCloseCallback)
         
         
+        
         let onHeaderCallback: @convention(c) (UnsafeMutablePointer<nghttp2_session>?, UnsafePointer<nghttp2_frame>?, UnsafePointer<UInt8>?, Int, UnsafePointer<UInt8>?, Int, UInt8, UnsafeMutableRawPointer?) -> Int32 = { (session, frame, name, namelen, value, valuelen, flags, userData) in
+            // Called when nghttp2 library emits single header name/value pair.
+            
+            if let frame = frame {
+                switch frame.pointee.hd.type {
+                case UInt8(NGHTTP2_HEADERS.rawValue):
+                    if (frame.pointee.headers.cat != NGHTTP2_HCAT_REQUEST) {
+                        break
+                    }
+                    
+                    if let name = name, let value = value, let userData = userData {
+                        let nameData = Data(bytes: name, count: namelen)
+                        let nameStr = String(data: nameData, encoding: .utf8)
+                        
+                        let valueData = Data(bytes: value, count: valuelen)
+                        let valueStr = String(data: valueData, encoding: .utf8)
+                        
+                        let streamId = frame.pointee.hd.stream_id
+                        
+                        if let nameStr = nameStr, let valueStr = valueStr {
+                            print("header - name: \(nameStr), value: \(valueStr)")
+                            
+                            let session = userData.load(as: Http2Session.self)
+                            var streamData = session.streamsData[streamId]
+                            
+                            switch nameStr {
+                            case ":path": streamData?.requestPath = valueStr
+                            case ":method": streamData?.method = valueStr
+                            case ":scheme": streamData?.scheme = valueStr
+                            case ":authority": streamData?.authority = valueStr
+                            default: streamData?.headers.append(nameStr, value: valueStr)
+                            }
+                            
+                            session.streamsData[streamId] = streamData
+                        }
+                    }
+                    
+                default:
+                    break
+                }
+            }
+            
             return 0
         }
         nghttp2_session_callbacks_set_on_header_callback(callbacks, onHeaderCallback)
+        
         
         
         let onBeginHeadersCallback: @convention(c) (UnsafeMutablePointer<nghttp2_session>?, UnsafePointer<nghttp2_frame>?, UnsafeMutableRawPointer?) -> Int32 = { (session, frame, userData) in
@@ -140,9 +211,15 @@ class Http2Session {
                 return 0
             }
             
-            //TODO Create stream user data object and attach it to the stream by calling:
-            var streamInfo = ""
-            nghttp2_session_set_stream_user_data(session, frame.pointee.hd.stream_id, &streamInfo)
+            
+            if let userData = userData {
+                let streamId = frame.pointee.hd.stream_id
+                var streamData = StreamData(streamId: streamId)
+                userData.load(as: Http2Session.self).streamsData[streamId] = streamData
+                nghttp2_session_set_stream_user_data(session, streamId, &streamData)
+                
+                print("Stream \(streamId) was created")
+            }
             
             return 0
         }
@@ -161,7 +238,7 @@ class Http2Session {
         return session
     }
     
-    private func sendSettings() -> Int32 {
+    public func sendServerConnectionHeader() -> Int32 {
         let iv: [nghttp2_settings_entry] = [
             nghttp2_settings_entry(settings_id: Int32(NGHTTP2_SETTINGS_MAX_CONCURRENT_STREAMS.rawValue), value: 100)
         ]
@@ -202,7 +279,7 @@ class Http2Session {
         }
         var dataProvider = nghttp2_data_provider(source: dataSource, read_callback: readCallback)
         
-        var streamData = StreamData(streamId: streamId, dataLengths: [UnsafeMutableRawPointer: Int]())
+        var streamData = StreamData(streamId: streamId)
         streamData.dataLengths[data] = length
         streamsData[streamId] = streamData
         
