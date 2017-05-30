@@ -21,7 +21,7 @@ import KituraNet
 
 struct StreamData {
     var streamId: Int32
-    var dataLengths = [UnsafeMutableRawPointer: Int]()
+	var dataInfo = [UnsafeMutableRawPointer: (length: Int, offset: Int)]()
     var headers = HeadersContainer()
     var requestPath: String?
     var method: String?
@@ -269,20 +269,28 @@ class Http2Session {
             
             let opaquePtr = OpaquePointer(source.pointee.ptr)
             
-            guard let dataPtr = UnsafeMutablePointer<UInt8>(opaquePtr), let toBuffer = buf, let dataLength = streamInfo.dataLengths[dataPtr] else {
+            guard let dataPtr = UnsafeMutablePointer<UInt8>(opaquePtr), let toBuffer = buf, let dataInfo = streamInfo.dataInfo[dataPtr] else {
                 return -1
             }
-            
-            toBuffer.initialize(from: dataPtr, count: dataLength)
-            dataFlags?.pointee |= NGHTTP2_DATA_FLAG_EOF.rawValue
-            return dataLength
+			let dataLengthRemained = dataInfo.length - dataInfo.offset
+			let copyLength = min(dataLengthRemained, length)
+            toBuffer.initialize(from: dataPtr.advanced(by: dataInfo.offset), count: copyLength)
+			if copyLength == dataLengthRemained {
+				//No more data left
+				dataFlags?.pointee |= NGHTTP2_DATA_FLAG_EOF.rawValue
+			} else {
+				//The data left is larger than the max payload length
+				let offset = dataInfo.offset + copyLength
+				userData.load(as: Http2Session.self).streamsData[streamId]?.dataInfo[dataPtr] = (dataInfo.length, offset)
+			}
+            return copyLength
         }
         var dataProvider = nghttp2_data_provider(source: dataSource, read_callback: readCallback)
         
         var streamData = StreamData(streamId: streamId)
-        streamData.dataLengths[data] = length
+        streamData.dataInfo[data] = (length, 0)
         streamsData[streamId] = streamData
-        
+		
         let rv = nghttp2_submit_response(session, streamId, headers, headers.count, &dataProvider)
         if rv != 0 {
             return -1
