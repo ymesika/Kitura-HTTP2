@@ -39,7 +39,7 @@ class Http2Session {
     var initialRequest: HTTP2ServerRequest?
     var session: UnsafeMutablePointer<nghttp2_session>? = nil
     var streamsData = [Int32: StreamData]()
-    var nghttp2UserData: Http2Session!
+    var nghttp2UserData: Http2Session?
     var remoteAddress: String?
     
     init() {
@@ -67,7 +67,10 @@ class Http2Session {
     }
     
     public func close() {
-        nghttp2_session_del(session)
+		nghttp2_session_del(session)
+		session = nil
+		processor = nil
+		nghttp2UserData = nil
         print("HTTP2 session closed")
     }
     
@@ -146,6 +149,7 @@ class Http2Session {
         
         let onStreamCloseCallback: @convention(c) (UnsafeMutablePointer<nghttp2_session>?, Int32, UInt32, UnsafeMutableRawPointer?) -> Int32 = { (session, streamId, errorCode, userData) in
             Log.debug("Stream \(streamId) closed")
+			userData?.load(as: Http2Session.self).streamsData[streamId] = nil
             return 0
         }
         nghttp2_session_callbacks_set_on_stream_close_callback(callbacks, onStreamCloseCallback)
@@ -172,7 +176,7 @@ class Http2Session {
                         let streamId = frame.pointee.hd.stream_id
                         
                         if let nameStr = nameStr, let valueStr = valueStr {
-                            print("header - name: \(nameStr), value: \(valueStr)")
+                            Log.debug("Received a header - name: \(nameStr), value: \(valueStr)")
                             
                             let session = userData.load(as: Http2Session.self)
                             var streamData = session.streamsData[streamId]
