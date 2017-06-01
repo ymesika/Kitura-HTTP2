@@ -1,5 +1,5 @@
 /*
- * Copyright IBM Corporation 2016-2017
+ * Copyright IBM Corporation 2017
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,41 +15,49 @@
  */
 
 import Foundation
-
 import KituraNet
 import LoggerAPI
 import Socket
 
-class H2CSocketProcessor: IncomingSocketProcessor {
+class H2SocketProcessor: IncomingSocketProcessor {
     
     /// The socket if idle will be kept alive until...
     public var keepAliveUntil: TimeInterval = 500.0
     
     /// A flag to indicate that the socket has a request in progress
     public var inProgress = true
-    
+	
+	/// The handler of this processor
     public weak var handler: IncomingSocketHandler? {
         didSet{
             if handler != nil {
-                /* Send HTTP/2 client connection header, which includes 24 bytes
-                 magic octets and SETTINGS frame */
+                // Send HTTP/2 client connection header, which includes 24 bytes
+                // magic octets and SETTINGS frame
 				do {
 					try http2Session?.sendServerConnectionHeader()
 				} catch {
 					Log.error("Failed to send server connection response header")
 				}
 				
+				// If it is a connection upgrade, send the response data to the initial
+				// request
                 if http1Upgrade {
                     http2Session?.sendInitialRequestData()
                 }
             }
         }
     }
-    
+	
+	/// Instance of 'Http2Session' to handle http2 operations
     private let http2Session: Http2Session?
-    
+	
+	/// Indicates whether this connection is a result of HTTP/1 connection upgrade
     private let http1Upgrade: Bool
-    
+	
+	/// Create an instance of 'IncomingSocketProcessor'
+	///
+	/// - Parameter session: Instance of 'Http2Session'
+	/// - Parameter upgrade: Was it an HTTP/1 connection upgrade request?
     public init(session: Http2Session, upgrade: Bool) {
         http2Session = session
         http1Upgrade = upgrade
@@ -99,14 +107,14 @@ class H2CSocketProcessor: IncomingSocketProcessor {
     
 }
 
-class H2CSocketProcessorCreator: IncomingSocketProcessorCreator {
+class H2SocketProcessorCreator: IncomingSocketProcessorCreator {
     public let name = "h2"
     
     public func createIncomingSocketProcessor(socket: Socket, using: ServerDelegate) -> IncomingSocketProcessor {
         Log.debug("Creating IncomingSocketProcessor for socket \(socket.socketfd). Remote address: \(socket.remoteHostname)")
         let session = Http2Session()
         session.remoteAddress = socket.remoteHostname
-        let processor = H2CSocketProcessor(session: session, upgrade: false)
+        let processor = H2SocketProcessor(session: session, upgrade: false)
         session.processor = processor
         return processor
     }

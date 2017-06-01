@@ -1,5 +1,5 @@
 /*
- * Copyright IBM Corporation 2016-2017
+ * Copyright IBM Corporation 2017
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -23,12 +23,22 @@ public class H2ConnectionUpgradeFactory: ConnectionUpgradeFactory {
     
     /// The name of the protocol supported by this `ConnectionUpgradeFactory`.
     public let name = "h2c"
-    
+	
+	/// Create an instance of this 'ConnectionUpgradeFactory'
     init() {
         ConnectionUpgrader.register(factory: self)
     }
     
-    public func upgrade(handler: IncomingSocketHandler, request: ServerRequest, response: ServerResponse) -> (IncomingSocketProcessor?, String?) {
+	/// "Upgrade" a connection to the HTTP/2 protocol.
+	///
+	/// - Parameter handler: The `IncomingSocketHandler` that is handling the connection being upgraded.
+	/// - Parameter request: The `ServerRequest` object of the incoming "upgrade" request.
+	/// - Parameter response: The `ServerResponse` object that will be used to send the response of the "upgrade" request.
+	///
+	/// - Returns: A tuple of the created `IncomingSocketProcessor` and a message to send as the body of the response to
+	///           the upgrade request. The `IncomingSocketProcessor` should be nil if the upgrade request wasn't successful.
+	///           If the message is nil, the response will not contain a body.
+	public func upgrade(handler: IncomingSocketHandler, request: ServerRequest, response: ServerResponse) -> (IncomingSocketProcessor?, String?) {
         
         guard let settings = request.headers["HTTP2-Settings"] else {
             return (nil, "Upgrade request MUST include exactly one 'HTTP2-Settings' header field.")
@@ -45,7 +55,7 @@ public class H2ConnectionUpgradeFactory: ConnectionUpgradeFactory {
         response.statusCode = .switchingProtocols
         
         let session = Http2Session(settingsPayload: decodedSettings, with: request)
-        let processor = H2CSocketProcessor(session: session, upgrade: true)
+        let processor = H2SocketProcessor(session: session, upgrade: true)
         session.processor = processor
         
         return (processor, nil)

@@ -15,7 +15,6 @@
  */
 
 import Foundation
-
 import KituraNet
 
 /// An internal class used to retain information from the original request that
