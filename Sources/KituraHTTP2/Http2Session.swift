@@ -128,6 +128,8 @@ class Http2Session {
                             }
                         }
                     }
+				case NGHTTP2_PING.rawValue:
+					Log.debug("Received Frame - Ping (automatically handled by the nghttp2 library)")
                 case NGHTTP2_SETTINGS.rawValue:
                     Log.debug("Received Frame - Settings")
                 case NGHTTP2_WINDOW_UPDATE.rawValue:
