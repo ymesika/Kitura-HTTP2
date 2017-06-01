@@ -34,7 +34,7 @@ class H2CSocketProcessor: IncomingSocketProcessor {
                 /* Send HTTP/2 client connection header, which includes 24 bytes
                  magic octets and SETTINGS frame */
                 if (http2Session?.sendServerConnectionHeader() != 0) {
-                    print("Failed to send server connection response header")
+                    Log.error("Failed to send server connection response header")
                 }
                 
                 if http1Upgrade {
@@ -61,7 +61,7 @@ class H2CSocketProcessor: IncomingSocketProcessor {
     /// - Returns: true if the data was processed, false if it needs to be processed later.
     public func process(_ buffer: NSData) -> Bool {
         if http2Session?.processIncomingData(buffer: buffer) != 0 {
-            print("Failed to proccess incoming socket data")
+            Log.error("Failed to proccess incoming socket data")
             return false
         }
         return true
@@ -101,7 +101,7 @@ class H2CSocketProcessorCreator: IncomingSocketProcessorCreator {
     public let name = "h2"
     
     public func createIncomingSocketProcessor(socket: Socket, using: ServerDelegate) -> IncomingSocketProcessor {
-        print("Creating IncomingSocketProcessor for socket \(socket.socketfd). Remote address: \(socket.remoteHostname)")
+        Log.debug("Creating IncomingSocketProcessor for socket \(socket.socketfd). Remote address: \(socket.remoteHostname)")
         let session = Http2Session()
         session.remoteAddress = socket.remoteHostname
         let processor = H2CSocketProcessor(session: session, upgrade: false)

@@ -71,7 +71,7 @@ class Http2Session {
 		session = nil
 		processor = nil
 		nghttp2UserData = nil
-        print("HTTP2 session closed")
+        Log.debug("HTTP2 session closed")
     }
     
     private func initNGHttp2Session() -> UnsafeMutablePointer<nghttp2_session>? {
@@ -79,7 +79,7 @@ class Http2Session {
         var callbacks: UnsafeMutablePointer<nghttp2_session_callbacks>? = UnsafeMutablePointer<nghttp2_session_callbacks>(&callbacks_)
         var stat = nghttp2_session_callbacks_new(UnsafeMutablePointer<UnsafeMutablePointer<nghttp2_session_callbacks>?>(&callbacks))
         guard stat == 0 else {
-            print("Failed to initialize the callbacks struct with error: \(stat)")
+            Log.error("Failed to initialize the callbacks struct with error: \(stat)")
             return nil
         }
         
@@ -99,10 +99,10 @@ class Http2Session {
             if let frame = frame {
                 switch (UInt32(frame.pointee.hd.type)) {
                 case NGHTTP2_DATA.rawValue:
-                    print("Received Frame - Data")
+                    Log.debug("Received Frame - Data")
                     fallthrough
                 case NGHTTP2_HEADERS.rawValue:
-                    print("Received Frame - Headers")
+                    Log.debug("Received Frame - Headers")
                     /* Check that the client request has finished */
                     if (frame.pointee.hd.flags & UInt8(NGHTTP2_FLAG_END_HEADERS.rawValue)) != 0 {
                         if let userData = userData, let session = userData.load(as: Http2Session.self).session {
@@ -129,17 +129,17 @@ class Http2Session {
                         }
                     }
                 case NGHTTP2_SETTINGS.rawValue:
-                    print("Received Frame - Settings")
+                    Log.debug("Received Frame - Settings")
                 case NGHTTP2_WINDOW_UPDATE.rawValue:
-                    print("Received Frame - Window Update")
+                    Log.debug("Received Frame - Window Update")
                 case NGHTTP2_PRIORITY.rawValue:
-                    print("Received Frame - Priority")
+                    Log.debug("Received Frame - Priority")
                 case NGHTTP2_RST_STREAM.rawValue:
-                    print("Received Frame - Rst Stream (id: \(frame.pointee.hd.stream_id))")
+                    Log.debug("Received Frame - Rst Stream (id: \(frame.pointee.hd.stream_id))")
                 case NGHTTP2_GOAWAY.rawValue:
-                    print("Received Frame - Goaway")
+                    Log.debug("Received Frame - Goaway")
                 default:
-                    print("Received Unknown Frame - type:\(frame.pointee.hd.type) streamId:\(frame.pointee.hd.stream_id)")
+                    Log.warning("Received Unknown Frame - type:\(frame.pointee.hd.type) streamId:\(frame.pointee.hd.stream_id)")
                 }
             }
             return 0
@@ -222,7 +222,7 @@ class Http2Session {
                 userData.load(as: Http2Session.self).streamsData[streamId] = streamData
                 nghttp2_session_set_stream_user_data(session, streamId, &streamData)
                 
-                print("Stream \(streamId) was created")
+                Log.debug("Stream \(streamId) was created")
             }
             
             return 0
@@ -233,7 +233,7 @@ class Http2Session {
         var session: UnsafeMutablePointer<nghttp2_session>?
         stat = nghttp2_session_server_new(UnsafeMutablePointer<UnsafeMutablePointer<nghttp2_session>?>(&session), callbacks, &nghttp2UserData)
         guard stat == 0 else {
-            print("Failed to initialize the callbacks struct with error: \(stat)")
+            Log.error("Failed to initialize the callbacks struct with error: \(stat)")
             return nil
         }
         
@@ -248,7 +248,7 @@ class Http2Session {
         ]
         let result = nghttp2_submit_settings(session, UInt8(NGHTTP2_FLAG_NONE.rawValue), iv, iv.count)
         if (result != 0) {
-            print("Failed to submit settings")
+            Log.error("Failed to submit settings")
             return result
         }
         
