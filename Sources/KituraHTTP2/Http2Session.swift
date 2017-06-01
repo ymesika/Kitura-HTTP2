@@ -19,34 +19,75 @@ import nghttp2
 import LoggerAPI
 import KituraNet
 
+/// This struct holds metadata for a specific stream and its data.
+/// Most of the information is coming from the header frame once the stream
+/// has been created.
+/// The dataInfo holds mapping between data to be sent and its total length and
+/// the offset for the next data frame. This is being used for breaking large data
+/// into pieces and send it in multiple data frames.
 struct StreamData {
+	
+	// The unique stream ID
     var streamId: Int32
+	
+	// Mapping from data pointer to the length of data and offset for next submission
 	var dataInfo = [UnsafeMutableRawPointer: (length: Int, offset: Int)]()
+	
+	// Request headers
     var headers = HeadersContainer()
+	
+	// The URL path of the request
     var requestPath: String?
+	
+	// The HTTP method of the request
     var method: String?
+	
+	// HTTP scheme used in the request
     var scheme: String?
+	
+	// The request authority
     var authority: String?
-    
+	
+	// Initialize new instance for the specified stream ID
     init(streamId: Int32) {
         self.streamId = streamId
     }
 }
 
 class Http2Session {
-    
+	
+	// Reference to the processor that created this session
     weak var processor: H2CSocketProcessor? = nil
-    var initialRequest: HTTP2ServerRequest?
-    var session: UnsafeMutablePointer<nghttp2_session>? = nil
-    var streamsData = [Int32: StreamData]()
-    var nghttp2UserData: Http2Session?
+	
+	// The initial request (when initiated by an upgrade request)
+	var initialRequest: HTTP2ServerRequest?
+	
+	// The nghttp2 session
+	var session: UnsafeMutablePointer<nghttp2_session>? = nil
+	
+	// Mapping between streams IDs and the information about data waiting to be sent
+	var streamsData = [Int32: StreamData]()
+	
+	// The user data object to be used in all nghttp2 callback functions
+	var nghttp2UserData: Http2Session?
+	
+	// Holds the hostname address of the client. Being set externally
     var remoteAddress: String?
-    
+	
+	/// Initialize an `Http2Session` instance
+	/// This initializer is being used when the negotiated ALPN protocol over SSL is 'h2'. Meaning the client
+	/// requested that the protocol to use is the HTTP/2.
     init() {
         nghttp2UserData = self
         session = initNGHttp2Session()
     }
-    
+	
+	/// Initialize an `Http2Session` instance
+	/// This initializer is being used when an HTTP upgrade request is asking for an upgrade to HTTP/2 using
+	/// the 'h2c' upgrade name over non secured connection.
+	///
+	/// - Parameter settingsPayload: The initial settings payload that was sent in the upgrade request.
+	/// - Parameter serverRequest: The request that initiated the upgrade
     init(settingsPayload: Data, with serverRequest: ServerRequest? = nil) {
         nghttp2UserData = self
         session = initNGHttp2Session()
@@ -57,7 +98,10 @@ class Http2Session {
         
         nghttp2_session_upgrade2(session, [UInt8](settingsPayload), settingsPayload.count, 0, nil)
     }
-    
+	
+	/// The function will send a response to the initial request. Only used when connection upgrade has
+	/// initiated the session.
+	/// It can be called once the handler has been set and ready to handle requests.
     public func sendInitialRequestData() {
         if let request = initialRequest {
             //Data frame for an upgrade request will be returned on stream 1
@@ -65,7 +109,8 @@ class Http2Session {
             HTTP2.delegate?.handle(request: request, response: response)
         }
     }
-    
+	
+	/// Close this session.
     public func close() {
 		nghttp2_session_del(session)
 		session = nil
@@ -73,7 +118,8 @@ class Http2Session {
 		nghttp2UserData = nil
         Log.debug("HTTP2 session closed")
     }
-    
+	
+	/// Initialize a new nghttp2 session and return it.
     private func initNGHttp2Session() -> UnsafeMutablePointer<nghttp2_session>? {
         var callbacks_ = nghttp2_session_callbacks()
         var callbacks: UnsafeMutablePointer<nghttp2_session_callbacks>? = UnsafeMutablePointer<nghttp2_session_callbacks>(&callbacks_)
@@ -105,26 +151,23 @@ class Http2Session {
                     Log.debug("Received Frame - Headers")
                     /* Check that the client request has finished */
                     if (frame.pointee.hd.flags & UInt8(NGHTTP2_FLAG_END_HEADERS.rawValue)) != 0 {
-                        if let userData = userData, let session = userData.load(as: Http2Session.self).session {
-                            let streamData = nghttp2_session_get_stream_user_data(session, frame.pointee.hd.stream_id)
+                        if let userData = userData {
                             /* For DATA and HEADERS frame, this callback may be called after
                              on_stream_close_callback. Check that stream still alive. */
-                            if streamData == nil {
+                            if nghttp2_session_get_stream_user_data(userData.load(as: Http2Session.self).session, frame.pointee.hd.stream_id) == nil {
                                 return 0
                             }
                             
                             let session = userData.load(as: Http2Session.self)
                             let streamId = frame.pointee.hd.stream_id
-                            if let sData = session.streamsData[streamId], let requestPath = sData.requestPath {
-                                if let urlFromPath = URL(string: requestPath), let pathData = requestPath.data(using: .utf8) {
-                                    let request = HTTP2ServerRequest(url: pathData, urlURL: urlFromPath, remoteAddress: session.remoteAddress ?? "")
-                                    request.method = sData.method ?? "GET"
-                                    for (key, value) in sData.headers {
-                                        request.headers.append(key, value: value)
-                                    }
-                                    let response = HTTP2ServerResponse(session: session, streamId: streamId)
-                                    HTTP2.delegate?.handle(request: request, response: response)
-                                }
+                            if let sData = session.streamsData[streamId], let requestPath = sData.requestPath, let urlFromPath = URL(string: requestPath), let pathData = requestPath.data(using: .utf8) {
+								let request = HTTP2ServerRequest(url: pathData, urlURL: urlFromPath, remoteAddress: session.remoteAddress ?? "")
+								request.method = sData.method ?? "GET"
+								for (key, value) in sData.headers {
+									request.headers.append(key, value: value)
+								}
+								let response = HTTP2ServerResponse(session: session, streamId: streamId)
+								HTTP2.delegate?.handle(request: request, response: response)
                             }
                         }
                     }
@@ -243,25 +286,44 @@ class Http2Session {
         
         return session
     }
-    
-    public func sendServerConnectionHeader() -> Int32 {
+	
+	/// The function will send HTTP/2 client connection header, which includes 24 bytes	magic octets and SETTINGS frame
+	public func sendServerConnectionHeader() throws {
         let iv: [nghttp2_settings_entry] = [
             nghttp2_settings_entry(settings_id: Int32(NGHTTP2_SETTINGS_MAX_CONCURRENT_STREAMS.rawValue), value: 100)
         ]
-        let result = nghttp2_submit_settings(session, UInt8(NGHTTP2_FLAG_NONE.rawValue), iv, iv.count)
-        if (result != 0) {
+        var rv = nghttp2_submit_settings(session, UInt8(NGHTTP2_FLAG_NONE.rawValue), iv, iv.count)
+        if rv != 0 {
             Log.error("Failed to submit settings")
-            return result
+            throw HTTP2Errors.failedToSend
         }
-        
-        return sessionSend()
+		
+		rv = sessionSend()
+		if rv != 0 {
+			Log.error("Failed to send session")
+			throw HTTP2Errors.failedToSend
+		}
     }
     
-    public func sendData(streamId: Int32, data: Data, headers: [nghttp2_nv]) {
+	/// The function will use the nghttp2 library to send stream data to the client.
+	///
+	/// - Parameter streamId: The ID of the stream to be used in sent frame(s)
+	/// - Parameter data: The Data object that holds the data to be sent
+	/// - Parameter headers: A collection of name-value headers to be added to the data frame
+	public func sendData(streamId: Int32, data: Data, headers: [nghttp2_nv]) throws {
         var mutData: [UInt8] = Array(data)
-        _ = sendData(streamId: streamId, data: &mutData, length: mutData.count, headers: headers)
+		if sendData(streamId: streamId, data: &mutData, length: mutData.count, headers: headers) != 0 {
+			throw HTTP2Errors.failedToSend
+		}
     }
-    
+	
+	/// The function will use the nghttp2 library to send stream data to the client.
+	///
+	/// - Parameter streamId: The ID of the stream to be used in sent frame(s)
+	/// - Parameter data: A pointer to the data bytes
+	/// - Parameter length: The number of bytes of data
+	/// - Parameter headers: A collection of name-value headers to be added to the data frame
+	/// - Returns: 0 if successfully sent. Other value if error occurred.
     private func sendData(streamId: Int32, data: UnsafeMutableRawPointer, length: Int, headers: [nghttp2_nv]) -> Int32 {
         let dataSource = nghttp2_data_source(ptr: data)
         let readCallback: @convention(c) (UnsafeMutablePointer<nghttp2_session>?, Int32, UnsafeMutablePointer<UInt8>?, Int, UnsafeMutablePointer<UInt32>?, UnsafeMutablePointer<nghttp2_data_source>?, UnsafeMutableRawPointer?) -> Int = { (session, streamId, buf, length, dataFlags, source, userData) in
@@ -305,8 +367,8 @@ class Http2Session {
         return sessionSend()
     }
     
-    /* Read the data in the buffer and feed it into nghttp2 library function. Invocation of nghttp2_session_mem_recv() may make
-     additional pending frames, so call session_send() at the end of the function. */
+    /// Read the data in the buffer and feed it into nghttp2 library function. Invocation of nghttp2_session_mem_recv() may make
+    /// additional pending frames, so call session_send() at the end of the function.
     public func processIncomingData(buffer: NSData) -> Int32 {
         let readlen = nghttp2_session_mem_recv(session, buffer.bytes.assumingMemoryBound(to: UInt8.self), buffer.length)
         if readlen < 0 {
@@ -314,7 +376,8 @@ class Http2Session {
         }
         return sessionSend()
     }
-    
+	
+	/// Send all the session data that is waiting to be sent (all streams)
     private func sessionSend() -> Int32 {
         let result = nghttp2_session_send(session)
         if result != 0 {

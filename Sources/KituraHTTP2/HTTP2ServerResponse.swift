@@ -85,7 +85,7 @@ class HTTP2ServerResponse: ServerResponse {
     func end() throws {
         if let data = frameData {
             let frameHeaders = nghttp2Headers()
-            http2Session.sendData(streamId: stream, data: data, headers: frameHeaders)
+            try http2Session.sendData(streamId: stream, data: data, headers: frameHeaders)
         }
     }
     

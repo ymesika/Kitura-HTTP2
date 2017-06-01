@@ -16,6 +16,14 @@
 
 import KituraNet
 
+//
+// Exceptions
+//
+enum HTTP2Errors : Swift.Error {
+	case failedToSend
+	case internalError
+}
+
 /// Main class for the Kitura-HTTP2 API.
 public class HTTP2 {
     static var delegate: ServerDelegate?

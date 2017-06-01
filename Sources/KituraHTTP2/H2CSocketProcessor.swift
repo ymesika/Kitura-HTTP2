@@ -33,10 +33,12 @@ class H2CSocketProcessor: IncomingSocketProcessor {
             if handler != nil {
                 /* Send HTTP/2 client connection header, which includes 24 bytes
                  magic octets and SETTINGS frame */
-                if (http2Session?.sendServerConnectionHeader() != 0) {
-                    Log.error("Failed to send server connection response header")
-                }
-                
+				do {
+					try http2Session?.sendServerConnectionHeader()
+				} catch {
+					Log.error("Failed to send server connection response header")
+				}
+				
                 if http1Upgrade {
                     http2Session?.sendInitialRequestData()
                 }
