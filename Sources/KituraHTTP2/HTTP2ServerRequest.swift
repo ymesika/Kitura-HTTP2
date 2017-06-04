@@ -66,6 +66,9 @@ class HTTP2ServerRequest: ServerRequest {
     
     /// The HTTP Method specified in the request
     var method: String = "GET"
+	
+	/// Holds the data received in the data frame(s)
+	var reqData: Data?
     
     init(url: Data, urlURL: URL, remoteAddress: String) {
         self.url = url
@@ -90,6 +93,9 @@ class HTTP2ServerRequest: ServerRequest {
     /// - Throws: Socket.error if an error occurred while reading from the socket
     /// - Returns: The number of bytes read
     func read(into data: inout Data) throws -> Int {
+		if let reqData = reqData {
+			data.append(reqData)
+		}
         return 0
     }
     
@@ -98,7 +104,10 @@ class HTTP2ServerRequest: ServerRequest {
     /// - Throws: Socket.error if an error occurred while reading from the socket
     /// - Returns: An Optional string
     func readString() throws -> String? {
-        return nil
+		if let reqData = reqData {
+			return String(data: reqData, encoding: .utf8)
+		}
+		return nil
     }
     
     
@@ -109,6 +118,10 @@ class HTTP2ServerRequest: ServerRequest {
     /// - Throws: Socket.error if an error occurred while reading from the socket
     /// - Returns: The number of bytes read
     func readAllData(into data: inout Data) throws -> Int {
-        return 0
+		if let reqData = reqData {
+			data.append(reqData)
+			return reqData.count
+		}
+		return 0
     }
 }

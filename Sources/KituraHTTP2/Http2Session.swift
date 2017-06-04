@@ -48,6 +48,14 @@ struct StreamData {
 	// The request authority
     var authority: String?
 	
+	// The wrapper ServerRequest for the stream. It will be handled once all request
+	// frames arrive
+	var request: HTTP2ServerRequest?
+	
+	// The wrapper ServerResponse for the stream. It will be handled once all request
+	// frames arrive
+	var response: HTTP2ServerResponse?
+	
 	// Initialize new instance for the specified stream ID
     init(streamId: Int32) {
         self.streamId = streamId
@@ -139,35 +147,56 @@ class Http2Session {
         
         
 		nghttp2_session_callbacks_set_on_frame_recv_callback(callbacks) { (session, frame, userData) -> Int32 in
-			guard let frame = frame else {
+			guard let frame = frame, let userData = userData else {
+				// Make sure all mandatory arguments are indeed set
 				return -1
 			}
+			
+			let http2Session = userData.load(as: Http2Session.self)
+			let streamId = frame.pointee.hd.stream_id
 			
 			switch (UInt32(frame.pointee.hd.type)) {
 			case NGHTTP2_DATA.rawValue:
 				Log.debug("Received Frame - Data")
-				fallthrough
+				
+				if (frame.pointee.hd.flags & UInt8(NGHTTP2_FLAG_END_STREAM.rawValue)) != 0 {
+					// For DATA and HEADERS frame, this callback may be called after
+					// on_stream_close_callback. Check that stream still alive.
+					if nghttp2_session_get_stream_user_data(session, frame.pointee.hd.stream_id) == nil {
+						return 0
+					}
+					
+					if let sData = http2Session.streamsData[streamId], let request = sData.request, let response = sData.response {
+						HTTP2.delegate?.handle(request: request, response: response)
+					}
+				}
 			case NGHTTP2_HEADERS.rawValue:
 				Log.debug("Received Frame - Headers")
-				/* Check that the client request has finished */
+				
+				// Check that the client request has finished */
 				if (frame.pointee.hd.flags & UInt8(NGHTTP2_FLAG_END_HEADERS.rawValue)) != 0 {
-					if let userData = userData {
-						/* For DATA and HEADERS frame, this callback may be called after
-						 on_stream_close_callback. Check that stream still alive. */
-						if nghttp2_session_get_stream_user_data(session, frame.pointee.hd.stream_id) == nil {
-							return 0
+					// For DATA and HEADERS frame, this callback may be called after
+					// on_stream_close_callback. Check that stream still alive.
+					if nghttp2_session_get_stream_user_data(session, frame.pointee.hd.stream_id) == nil {
+						return 0
+					}
+					
+					if let sData = http2Session.streamsData[streamId], let requestPath = sData.requestPath, let urlFromPath = URL(string: requestPath), let pathData = requestPath.data(using: .utf8) {
+						let request = HTTP2ServerRequest(url: pathData, urlURL: urlFromPath, remoteAddress: http2Session.remoteAddress ?? "")
+						request.method = sData.method ?? "GET"
+						for (key, value) in sData.headers {
+							request.headers.append(key, value: value)
 						}
+						let response = HTTP2ServerResponse(session: http2Session, streamId: streamId)
 						
-						let http2Session = userData.load(as: Http2Session.self)
-						let streamId = frame.pointee.hd.stream_id
-						if let sData = http2Session.streamsData[streamId], let requestPath = sData.requestPath, let urlFromPath = URL(string: requestPath), let pathData = requestPath.data(using: .utf8) {
-							let request = HTTP2ServerRequest(url: pathData, urlURL: urlFromPath, remoteAddress: http2Session.remoteAddress ?? "")
-							request.method = sData.method ?? "GET"
-							for (key, value) in sData.headers {
-								request.headers.append(key, value: value)
-							}
-							let response = HTTP2ServerResponse(session: http2Session, streamId: streamId)
+						if (frame.pointee.hd.flags & UInt8(NGHTTP2_FLAG_END_STREAM.rawValue)) != 0 {
+							// No more frames, proccess the request
 							HTTP2.delegate?.handle(request: request, response: response)
+						} else {
+							// Data frames are expected to arrive. Save the request and response until they
+							// all arrive
+							http2Session.streamsData[streamId]?.request = request
+							http2Session.streamsData[streamId]?.response = response
 						}
 					}
 				}
@@ -189,6 +218,21 @@ class Http2Session {
 			
             return 0
         }
+		
+		
+		nghttp2_session_callbacks_set_on_data_chunk_recv_callback(callbacks) { (session, flags, streamId, data, len, userData) in
+			if let data = data, let userData = userData {
+				let http2Session = userData.load(as: Http2Session.self)
+				if let sData = http2Session.streamsData[streamId], let request = sData.request {
+					if request.reqData != nil {
+						request.reqData?.append(data, count: len)
+					} else {
+						request.reqData = Data(bytes: data, count: len)
+					}
+				}
+			}
+			return 0
+		}
 		
 		
 		nghttp2_session_callbacks_set_on_stream_close_callback(callbacks) { (session, streamId, errorCode, userData) in
@@ -221,7 +265,7 @@ class Http2Session {
 					let streamId = frame.pointee.hd.stream_id
 					
 					if let nameStr = nameStr, let valueStr = valueStr {
-						Log.debug("Received a header - name: \(nameStr), value: \(valueStr)")
+						Log.debug("Header entry [\(nameStr): \(valueStr)]")
 						
 						let http2Session = userData.load(as: Http2Session.self)
 						var streamData = http2Session.streamsData[streamId]
