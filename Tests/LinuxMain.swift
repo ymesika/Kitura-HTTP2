@@ -1,6 +1,7 @@
 import XCTest
-@testable import Kitura_HTTP2Tests
+
+@testable import KituraHTTP2Tests
 
 XCTMain([
-    testCase(Kitura_HTTP2Tests.allTests),
+    testCase(LargePayloadTests.allTests),
 ])
