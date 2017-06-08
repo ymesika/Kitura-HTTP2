@@ -80,7 +80,7 @@ class HTTP2ServerRequest: ServerRequest {
         url = request.url
         urlURL = request.urlURL
         remoteAddress = request.remoteAddress
-        
+        method = request.method
         for (key, values) in request.headers {
             headers.append(key, value: values)
         }
