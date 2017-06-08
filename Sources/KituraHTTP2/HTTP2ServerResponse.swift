@@ -21,7 +21,7 @@ import nghttp2
 class HTTP2ServerResponse: ServerResponse {
     
     /// The status code to send in the HTTP response.
-    var statusCode: HTTPStatusCode?
+	var statusCode: HTTPStatusCode?  = HTTPStatusCode.OK
     
     /// The headers to send back as part of the HTTP response.
     var headers = HeadersContainer()
