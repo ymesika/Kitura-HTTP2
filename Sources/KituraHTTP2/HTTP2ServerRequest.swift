@@ -81,6 +81,12 @@ class HTTP2ServerRequest: ServerRequest {
         urlURL = request.urlURL
         remoteAddress = request.remoteAddress
         method = request.method
+		reqData = Data()
+		do {
+			try _ = request.readAllData(into: &reqData!)
+		} catch {
+			reqData = nil
+		}
         for (key, values) in request.headers {
             headers.append(key, value: values)
         }
