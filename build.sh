@@ -1,7 +1,5 @@
 #!/bin/bash
 
-set -o verbose
-
 mkdir curl_build
 cd curl_build
 
@@ -10,8 +8,9 @@ sudo apt-get install binutils libcunit1-dev libssl-dev libxml2-dev libev-dev \
   libevent-dev libjansson-dev libjemalloc-dev cython python-setuptools
 
 # Build nghttp2 from source
-git clone https://github.com/nghttp2/nghttp2.git
-cd nghttp2
+wget https://github.com/nghttp2/nghttp2/releases/download/v1.23.1/nghttp2-1.23.1.tar.bz2
+tar -xvjf nghttp2-1.23.1.tar.bz2
+cd nghttp2-1.23.1
 autoreconf -i
 automake
 autoconf
@@ -32,6 +31,7 @@ make
 sudo make install
 sudo ldconfig
 cd ..
+
 cd ..
 
 curl --version
