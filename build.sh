@@ -2,14 +2,15 @@
 
 set -o verbose
 
-if [ -n "${DOCKER_IMAGE}" ]; then
-    docker pull ${DOCKER_IMAGE}
-    docker run --env SWIFT_VERSION -v ${TRAVIS_BUILD_DIR}:${TRAVIS_BUILD_DIR} ${DOCKER_IMAGE} /bin/bash -c "apt-get update && apt-get install -y git sudo lsb-release wget libxml2 && cd $TRAVIS_BUILD_DIR && ./build.sh"
-    echo "<<>>"
-    curl --version
-    openssl version
-else
-    test -n "${SWIFT_VERSION}" && echo "${SWIFT_VERSION}" > .swift-version || echo "SWIFT_VERSION not set, using $(cat .swift-version)"
-    git clone https://github.com/IBM-Swift/Package-Builder.git
-    ./Package-Builder/build-package.sh -projectDir $(pwd)
-fi
+mkdir curl_build
+cd curl_build
+sudo apt-get install build-essential nghttp2 libnghttp2-dev
+wget https://curl.haxx.se/download/curl-7.54.0.tar.bz2
+tar -xvjf curl-7.54.0.tar.bz2
+cd curl-7.54.0
+./configure --with-nghttp2 --prefix=/usr/local
+make
+sudo make install
+sudo ldconfig
+cd ..
+cd ..
