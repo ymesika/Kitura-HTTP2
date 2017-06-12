@@ -1,5 +1,5 @@
 /**
- * Copyright IBM Corporation 2016
+ * Copyright IBM Corporation 2017
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -22,13 +22,16 @@ import XCTest
 
 import Socket
 import KituraNet
+import CCurl
 
 class LargePayloadTests: KituraHTTP2Test {
 
     static var allTests : [(String, (LargePayloadTests) -> () throws -> Void)] {
         return [
-            ("testLargePosts", testLargePosts),
-            ("testLargeGets", testLargeGets)
+            ("testLargePost", testLargePost),
+            ("testLargeGet", testLargeGet),
+            ("testSecuredLargePost", testSecuredLargePost),
+            ("testSecuredLargeGet", testSecuredLargeGet)
         ]
     }
 
@@ -42,44 +45,58 @@ class LargePayloadTests: KituraHTTP2Test {
 
     private let delegate = TestServerDelegate()
 
-    func testLargePosts() {
-        performServerTest(delegate, useSSL: false, asyncTasks: { expectation in
-            let payload = "[" + contentTypesString + "," + contentTypesString + contentTypesString + "," + contentTypesString + "]"
-            self.performRequest("post", path: "/largepost", callback: {response in
-                XCTAssertEqual(response?.statusCode, HTTPStatusCode.OK, "Status code wasn't .Ok was \(String(describing: response?.statusCode))")
-                do {
-                    let expectedResult = "Read \(payload.characters.count) bytes"
-                    var data = Data()
-                    let count = try response?.readAllData(into: &data)
-                    XCTAssertEqual(count, expectedResult.characters.count, "Result should have been \(expectedResult.characters.count) bytes, was \(String(describing: count)) bytes")
-                    let postValue = String(data: data, encoding: .utf8)
-                    if  let postValue = postValue {
-                        XCTAssertEqual(postValue, expectedResult)
-                    }
-                    else {
-                        XCTFail("postValue's value wasn't an UTF8 string")
-                    }
-                }
-                catch {
-                    XCTFail("Failed reading the body of the response")
-                }
-                expectation.fulfill()
-            }) {request in
-                request.write(from: payload)
-            }
-        })
+    func testLargePost() {
+		largePost(secured: false)
     }
 
-    func testLargeGets() {
-        performServerTest(delegate, useSSL: false, asyncTasks: { expectation in
-            // This test is NOT using self.performRequest, in order to test an extra signature of HTTP.request
-            let request = HTTP.request("http://localhost:\(self.port)/largepost") {response in
-                XCTAssertEqual(response?.statusCode, HTTPStatusCode.OK, "Status code wasn't .Ok was \(String(describing: response?.statusCode))")
-                expectation.fulfill()
-            }
-            request.end()
-        })
-    }
+    func testLargeGet() {
+		largeGet(secured: false)
+	}
+	
+	func testSecuredLargePost() {
+		largePost(secured: true)
+	}
+	
+	func testSecuredLargeGet() {
+		largeGet(secured: true)
+	}
+	
+	private func largePost(secured: Bool) {
+		performServerTest(delegate, useSSL: secured, asyncTasks: { expectation in
+			let payload = "[" + contentTypesString + "," + contentTypesString + contentTypesString + "," + contentTypesString + "]"
+			self.performRequest("post", path: "/largepost", callback: {response in
+				XCTAssertEqual(response?.statusCode, HTTPStatusCode.OK, "Status code wasn't .Ok was \(String(describing: response?.statusCode))")
+				do {
+					let expectedResult = "Read \(payload.characters.count) bytes"
+					var data = Data()
+					let count = try response?.readAllData(into: &data)
+					XCTAssertEqual(count, expectedResult.characters.count, "Result should have been \(expectedResult.characters.count) bytes, was \(String(describing: count)) bytes")
+					let postValue = String(data: data, encoding: .utf8)
+					if  let postValue = postValue {
+						XCTAssertEqual(postValue, expectedResult)
+					}
+					else {
+						XCTFail("postValue's value wasn't an UTF8 string")
+					}
+				}
+				catch {
+					XCTFail("Failed reading the body of the response")
+				}
+				expectation.fulfill()
+			}) {request in
+				request.write(from: payload)
+			}
+		})
+	}
+	
+	private func largeGet(secured: Bool) {
+		performServerTest(delegate, useSSL: secured, asyncTasks: { expectation in
+			self.performRequest("post", path: "/largepost", callback: { response in
+				XCTAssertEqual(response?.statusCode, HTTPStatusCode.OK, "Status code wasn't .Ok was \(String(describing: response?.statusCode))")
+				expectation.fulfill()
+			})
+		})
+	}
 
     private class TestServerDelegate : ServerDelegate {
 

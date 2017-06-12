@@ -1,5 +1,5 @@
 /**
- * Copyright IBM Corporation 2016
+ * Copyright IBM Corporation 2017
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -114,7 +114,7 @@ class KituraHTTP2Test: XCTestCase {
 
         let schema = self.useSSL ? "https" : "http"
         var options: [ClientRequest.Options] =
-            [.method(method), .schema(schema), .hostname("localhost"), .port(Int16(self.port)), .path(path), .headers(allHeaders)]
+            [.method(method), .schema(schema), .hostname("localhost"), .port(Int16(self.port)), .path(path), .headers(allHeaders), .useHTTP2]
         if self.useSSL {
             options.append(.disableSSLVerification)
         }
