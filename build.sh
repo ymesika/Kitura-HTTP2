@@ -33,5 +33,5 @@ sudo ldconfig
 cd ..
 
 cd ..
-
+ 
 curl --version
