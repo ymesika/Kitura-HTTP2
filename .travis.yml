@@ -23,6 +23,7 @@ matrix:
 #      sudo: required
 
 before_install:
+  - ./build.sh
   - git clone https://github.com/IBM-Swift/Package-Builder.git
 
 script:
