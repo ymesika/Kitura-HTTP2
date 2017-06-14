@@ -11,7 +11,7 @@ import XCTest
 
 class UtilsTests: XCTestCase {
     
-    static var allTests : [(String, (LargePayloadTests) -> () throws -> Void)] {
+    static var allTests : [(String, (UtilsTests) -> () throws -> Void)] {
         return [
             ("testBase64urlToBase64", testBase64urlToBase64),
             ("testDataAsHexString", testDataAsHexString)
