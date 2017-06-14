@@ -33,12 +33,12 @@ class HTTP2ServerResponse: ServerResponse {
     var frameData: Data? = nil
     
     /// The session object for sending the reponse
-    let http2Session: Http2Session
+    let http2Session: HTTP2Session
     
     /// The stream ID to send the response to
     let stream: Int32
     
-    init(session: Http2Session, streamId: Int32) {
+    init(session: HTTP2Session, streamId: Int32) {
         http2Session = session
         stream = streamId
         headers["Date"] = [SPIUtils.httpDate()]

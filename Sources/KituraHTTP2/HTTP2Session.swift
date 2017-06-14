@@ -62,10 +62,10 @@ struct StreamData {
     }
 }
 
-class Http2Session {
+class HTTP2Session {
 	
 	// Reference to the processor that created this session
-    weak var processor: H2SocketProcessor? = nil
+    weak var processor: HTTP2SocketProcessor? = nil
 	
 	// The initial request (when initiated by an upgrade request)
 	var initialRequest: HTTP2ServerRequest?
@@ -77,7 +77,7 @@ class Http2Session {
 	var streamsData = [Int32: StreamData]()
 	
 	// The user data object to be used in all nghttp2 callback functions
-	var nghttp2UserData: Http2Session?
+	var nghttp2UserData: HTTP2Session?
 	
 	// Holds the hostname address of the client. Being set externally
     var remoteAddress: String?
@@ -140,7 +140,7 @@ class Http2Session {
         
 		nghttp2_session_callbacks_set_send_callback(callbacks) { (session, data, length, flags, userData) -> Int in
 			if let data = data, length > 0 {
-				userData?.load(as: Http2Session.self).processor?.write(from: data, length: length)
+				userData?.load(as: HTTP2Session.self).processor?.write(from: data, length: length)
 			}
             return length
         }
@@ -152,7 +152,7 @@ class Http2Session {
 				return -1
 			}
 			
-			let http2Session = userData.load(as: Http2Session.self)
+			let http2Session = userData.load(as: HTTP2Session.self)
 			let streamId = frame.pointee.hd.stream_id
 			
 			switch (UInt32(frame.pointee.hd.type)) {
@@ -236,7 +236,7 @@ class Http2Session {
 		
 		nghttp2_session_callbacks_set_on_data_chunk_recv_callback(callbacks) { (session, flags, streamId, data, len, userData) in
 			if let data = data, let userData = userData {
-				let http2Session = userData.load(as: Http2Session.self)
+				let http2Session = userData.load(as: HTTP2Session.self)
 				if let sData = http2Session.streamsData[streamId], let request = sData.request {
 					if request.reqData != nil {
 						request.reqData?.append(data, count: len)
@@ -251,7 +251,7 @@ class Http2Session {
 		
 		nghttp2_session_callbacks_set_on_stream_close_callback(callbacks) { (session, streamId, errorCode, userData) in
 			Log.debug("Stream \(streamId) closed")
-			userData?.load(as: Http2Session.self).streamsData[streamId] = nil
+			userData?.load(as: HTTP2Session.self).streamsData[streamId] = nil
 			return 0
 		}
 		
@@ -281,7 +281,7 @@ class Http2Session {
 					if let nameStr = nameStr, let valueStr = valueStr {
 						Log.debug("Header entry [\(nameStr): \(valueStr)]")
 						
-						let http2Session = userData.load(as: Http2Session.self)
+						let http2Session = userData.load(as: HTTP2Session.self)
 						var streamData = http2Session.streamsData[streamId]
 						
 						switch nameStr {
@@ -316,7 +316,7 @@ class Http2Session {
 			
 			let streamId = frame.pointee.hd.stream_id
 			var streamData = StreamData(streamId: streamId)
-			userData?.load(as: Http2Session.self).streamsData[streamId] = streamData
+			userData?.load(as: HTTP2Session.self).streamsData[streamId] = streamData
 			nghttp2_session_set_stream_user_data(session, streamId, &streamData)
 			
 			Log.debug("Stream \(streamId) was created")
@@ -381,7 +381,7 @@ class Http2Session {
                 return -1
             }
             
-            guard let userData = userData, let streamInfo = userData.load(as: Http2Session.self).streamsData[streamId] else {
+            guard let userData = userData, let streamInfo = userData.load(as: HTTP2Session.self).streamsData[streamId] else {
                 return -1
             }
             
@@ -399,7 +399,7 @@ class Http2Session {
 			} else {
 				//The data left is larger than the max payload length
 				let offset = dataInfo.offset + copyLength
-				userData.load(as: Http2Session.self).streamsData[streamId]?.dataInfo[dataPtr] = (dataInfo.length, offset)
+				userData.load(as: HTTP2Session.self).streamsData[streamId]?.dataInfo[dataPtr] = (dataInfo.length, offset)
 			}
             return copyLength
         }

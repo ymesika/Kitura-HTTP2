@@ -19,7 +19,7 @@ import KituraNet
 import LoggerAPI
 
 
-public class H2ConnectionUpgradeFactory: ConnectionUpgradeFactory {
+public class HTTP2ConnectionUpgradeFactory: ConnectionUpgradeFactory {
     
     /// The name of the protocol supported by this `ConnectionUpgradeFactory`.
     public let name = "h2c"
@@ -54,8 +54,8 @@ public class H2ConnectionUpgradeFactory: ConnectionUpgradeFactory {
         
         response.statusCode = .switchingProtocols
         
-        let session = Http2Session(settingsPayload: decodedSettings, with: request)
-        let processor = H2SocketProcessor(session: session, upgrade: true)
+        let session = HTTP2Session(settingsPayload: decodedSettings, with: request)
+        let processor = HTTP2SocketProcessor(session: session, upgrade: true)
         session.processor = processor
         
         return (processor, nil)

@@ -19,7 +19,7 @@ import KituraNet
 import LoggerAPI
 import Socket
 
-class H2SocketProcessor: IncomingSocketProcessor {
+class HTTP2SocketProcessor: IncomingSocketProcessor {
     
     /// The socket if idle will be kept alive until...
     public var keepAliveUntil: TimeInterval = 500.0
@@ -48,17 +48,17 @@ class H2SocketProcessor: IncomingSocketProcessor {
         }
     }
 	
-	/// Instance of 'Http2Session' to handle http2 operations
-    private let http2Session: Http2Session?
+	/// Instance of 'HTTP2Session' to handle http2 operations
+    private let http2Session: HTTP2Session?
 	
 	/// Indicates whether this connection is a result of HTTP/1 connection upgrade
     private let http1Upgrade: Bool
 	
 	/// Create an instance of 'IncomingSocketProcessor'
 	///
-	/// - Parameter session: Instance of 'Http2Session'
+	/// - Parameter session: Instance of 'HTTP2Session'
 	/// - Parameter upgrade: Was it an HTTP/1 connection upgrade request?
-    public init(session: Http2Session, upgrade: Bool) {
+    public init(session: HTTP2Session, upgrade: Bool) {
         http2Session = session
         http1Upgrade = upgrade
     }
@@ -107,14 +107,14 @@ class H2SocketProcessor: IncomingSocketProcessor {
     
 }
 
-class H2SocketProcessorCreator: IncomingSocketProcessorCreator {
+class HTTP2SocketProcessorCreator: IncomingSocketProcessorCreator {
     public let name = "h2"
     
     public func createIncomingSocketProcessor(socket: Socket, using: ServerDelegate) -> IncomingSocketProcessor {
         Log.debug("Creating IncomingSocketProcessor for socket \(socket.socketfd). Remote address: \(socket.remoteHostname)")
-        let session = Http2Session()
+        let session = HTTP2Session()
         session.remoteAddress = socket.remoteHostname
-        let processor = H2SocketProcessor(session: session, upgrade: false)
+        let processor = HTTP2SocketProcessor(session: session, upgrade: false)
         session.processor = processor
         return processor
     }

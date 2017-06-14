@@ -30,8 +30,8 @@ public class HTTP2 {
     
     public static func using(serverDelegate: ServerDelegate?) {
         HTTP2.delegate = serverDelegate
-        _ = H2ConnectionUpgradeFactory()
+        _ = HTTP2ConnectionUpgradeFactory()
         
-        HTTPServer.register(incomingSocketProcessorCreator: H2SocketProcessorCreator())
+        HTTPServer.register(incomingSocketProcessorCreator: HTTP2SocketProcessorCreator())
     }
 }
