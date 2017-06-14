@@ -181,8 +181,22 @@ class Http2Session {
 						return 0
 					}
 					
-					if let sData = http2Session.streamsData[streamId], let requestPath = sData.requestPath, let urlFromPath = URL(string: requestPath), let pathData = requestPath.data(using: .utf8) {
-						let request = HTTP2ServerRequest(url: pathData, urlURL: urlFromPath, remoteAddress: http2Session.remoteAddress ?? "")
+					if let sData = http2Session.streamsData[streamId], let requestPath = sData.requestPath, let pathData = requestPath.data(using: .utf8) {
+                        
+                        var components = URLComponents()
+                        components.path = requestPath
+                        components.scheme = sData.scheme
+                        if let authority = http2Session.streamsData[streamId]?.authority {
+                            var authorityArr = authority.components(separatedBy: ":")
+                            components.host = authorityArr[0]
+                            components.port = authorityArr.count > 1 ? Int(authorityArr[1]) : nil
+                        }
+                        
+                        guard let requestUrl = components.url else {
+                            Log.warning("Failed to construct URL from the incoming headers")
+                            return 0
+                        }
+						let request = HTTP2ServerRequest(url: pathData, urlURL: requestUrl, remoteAddress: http2Session.remoteAddress ?? "")
 						request.method = sData.method ?? "GET"
 						for (key, value) in sData.headers {
 							request.headers.append(key, value: value)
