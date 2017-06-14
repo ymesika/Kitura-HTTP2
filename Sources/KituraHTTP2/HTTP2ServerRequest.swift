@@ -59,10 +59,10 @@ class HTTP2ServerRequest: ServerRequest {
     let remoteAddress: String
     
     /// Major version of HTTP of the request
-    var httpVersionMajor: UInt16? = 1
+    var httpVersionMajor: UInt16? = 2
     
     /// Minor version of HTTP of the request
-    var httpVersionMinor: UInt16? = 1
+    var httpVersionMinor: UInt16? = 0
     
     /// The HTTP Method specified in the request
     var method: String = "GET"
