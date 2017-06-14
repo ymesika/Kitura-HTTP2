@@ -5,4 +5,5 @@ import XCTest
 XCTMain([
     testCase(LargePayloadTests.allTests),
     testCase(ClientE2ETests.allTests),
+    testCase(UtilsTests.allTests),
 ])
