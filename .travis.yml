@@ -24,6 +24,7 @@ matrix:
 
 before_install:
   - if [[ "$TRAVIS_OS_NAME" == "linux" ]]; then ./build.sh ; fi
+  - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then brew install curl --with-nghttp2 ; fi
   - git clone https://github.com/IBM-Swift/Package-Builder.git
 
 script:
