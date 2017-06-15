@@ -27,12 +27,16 @@ import CCurl
 class LargePayloadTests: KituraHTTP2Test {
 
     static var allTests : [(String, (LargePayloadTests) -> () throws -> Void)] {
+        #if os(Linux)
         return [
             ("testLargePost", testLargePost),
             ("testLargeGet", testLargeGet),
             ("testSecuredLargePost", testSecuredLargePost),
             ("testSecuredLargeGet", testSecuredLargeGet)
         ]
+        #else
+        return []
+        #endif
     }
 
     override func setUp() {
@@ -44,6 +48,8 @@ class LargePayloadTests: KituraHTTP2Test {
     }
 
     private let delegate = TestServerDelegate()
+    
+    #if os(Linux)
 
     func testLargePost() {
 		largePost(secured: false)
@@ -60,17 +66,15 @@ class LargePayloadTests: KituraHTTP2Test {
 	func testSecuredLargeGet() {
 		largeGet(secured: true)
 	}
+    
+    #endif
 	
 	private func largePost(secured: Bool) {
 		performServerTest(delegate, useSSL: secured, asyncTasks: { expectation in
 			let payload = "[" + contentTypesString + "," + contentTypesString + contentTypesString + "," + contentTypesString + "]"
 			self.performRequest("post", path: "/largepost", callback: {response in
 				XCTAssertEqual(response?.statusCode, HTTPStatusCode.OK, "Status code wasn't .Ok was \(String(describing: response?.statusCode))")
-                #if os(Linux)
-                    XCTAssertEqual(response?.httpVersionMajor, 2, "Used HTTP/\(String(describing: response?.httpVersionMajor)) instead of HTTP/2")
-                #else
-                    secured ? XCTAssertEqual(response?.httpVersionMajor, 1, "Should have used HTTP/1.1") : XCTAssertEqual(response?.httpVersionMajor, 2, "Used HTTP/\(String(describing: response?.httpVersionMajor)) instead of HTTP/2")
-                #endif
+                XCTAssertEqual(response?.httpVersionMajor, 2, "Used HTTP/\(String(describing: response?.httpVersionMajor)) instead of HTTP/2")
 				do {
 					let expectedResult = "Read \(payload.characters.count) bytes"
 					var data = Data()
@@ -98,11 +102,7 @@ class LargePayloadTests: KituraHTTP2Test {
 		performServerTest(delegate, useSSL: secured, asyncTasks: { expectation in
 			self.performRequest("post", path: "/largepost", callback: { response in
                 XCTAssertEqual(response?.statusCode, HTTPStatusCode.OK, "Status code wasn't .Ok was \(String(describing: response?.statusCode))")
-                #if os(Linux)
-                    XCTAssertEqual(response?.httpVersionMajor, 2, "Used HTTP/\(String(describing: response?.httpVersionMajor)) instead of HTTP/2")
-                #else
-                    secured ? XCTAssertEqual(response?.httpVersionMajor, 1, "Should have used HTTP/1.1"): XCTAssertEqual(response?.httpVersionMajor, 2, "Used HTTP/\(String(describing: response?.httpVersionMajor)) instead of HTTP/2")
-                #endif
+                XCTAssertEqual(response?.httpVersionMajor, 2, "Used HTTP/\(String(describing: response?.httpVersionMajor)) instead of HTTP/2")
 				expectation.fulfill()
 			})
 		})
