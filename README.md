@@ -14,13 +14,16 @@ Using this package will allow modern browsers to connect to your web server with
 
 This package will also add to your server the support for using HTTP/2 protocol over cleartext connection by using the HTTP connection upgrade mechanism. However, keep in mind that web browsers are only supporting HTTP/2 over secured connection.
 
-Currently **only Linux** is supported due to limitations of `SecuredTransport` on MacOS.  
-Specifically MacOS's SecuredTransport does not expose access to the [ALPN TLS extension](https://www.rfc-editor.org/rfc/rfc7301.txt). Once this limitation is removed we will add support for MacOS too.
-
 ## Features:
 
 - HTTP/2 over TLS
 - HTTP/2 over cleartext (unsecured) TCP
+
+## Prerequisites:
+**OpenSSL v1.0.2** and above is required as ALPN is supported only in these versions.
+
+Currently **only Linux** is supported due to limitations of `SecuredTransport` on MacOS.  
+Specifically MacOS's SecuredTransport does not expose access to the [ALPN TLS extension](https://www.rfc-editor.org/rfc/rfc7301.txt). Once this limitation is removed we will add support for MacOS too.
 
 ## Usage:
 
@@ -35,6 +38,46 @@ Specifically MacOS's SecuredTransport does not expose access to the [ALPN TLS ex
   HTTP2.using(serverDelegate: myRouter)
   ```
   where `myRouter` is your _Router_ instance or any instance of _ServerDelegate_.
+
+## Testing
+The tests will tests HTTP/2 functionality only on Linux using Curl that has the HTTP2 feature.  
+- Curl with HTTP/2 module is being used for the tests client. To install it follow these steps:  
+  1. Get build requirements:
+     ```shell
+     sudo apt-get install binutils libcunit1-dev libssl-dev libxml2-dev libev-dev \
+       libevent-dev libjansson-dev libjemalloc-dev cython python-setuptools build-essential
+     ```
+  2. Build nghttp2 from source:
+     ```shell
+     wget https://github.com/nghttp2/nghttp2/releases/download/v1.23.1/nghttp2-1.23.1.tar.bz2
+     tar -xjf nghttp2-1.23.1.tar.bz2
+     cd nghttp2-1.23.1
+     autoreconf -i
+     automake
+     autoconf
+     ./configure --enable-lib-only
+     make --quiet
+     sudo make install
+     cd ..
+     ```
+  3. Build curl from source with the nghttp2 module:
+     ```shell
+     wget https://curl.haxx.se/download/curl-7.54.0.tar.bz2
+     tar -xjf curl-7.54.0.tar.bz2
+     cd curl-7.54.0
+     ./configure --with-nghttp2 --prefix=/usr/local
+     make --quiet
+     sudo make install
+     sudo ldconfig
+     cd ..
+     ```
+
+- Make sure HTTP2 is now supported in Curl by executing:
+```curl --version```.  
+```HTTP2``` should be listed in the list of features.
+
+- Run the tests by executing:
+```swift test```.
 
 
 ## Community
