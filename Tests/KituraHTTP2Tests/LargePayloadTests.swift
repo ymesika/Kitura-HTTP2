@@ -66,7 +66,11 @@ class LargePayloadTests: KituraHTTP2Test {
 			let payload = "[" + contentTypesString + "," + contentTypesString + contentTypesString + "," + contentTypesString + "]"
 			self.performRequest("post", path: "/largepost", callback: {response in
 				XCTAssertEqual(response?.statusCode, HTTPStatusCode.OK, "Status code wasn't .Ok was \(String(describing: response?.statusCode))")
-				XCTAssertEqual(response?.httpVersionMajor, 2, "Used HTTP/\(String(describing: response?.httpVersionMajor)) instead of HTTP/2")
+                #if os(Linux)
+                    XCTAssertEqual(response?.httpVersionMajor, 2, "Used HTTP/\(String(describing: response?.httpVersionMajor)) instead of HTTP/2")
+                #else
+                    secured ? XCTAssertEqual(response?.httpVersionMajor, 1, "Should have used HTTP/1.1") : XCTAssertEqual(response?.httpVersionMajor, 2, "Used HTTP/\(String(describing: response?.httpVersionMajor)) instead of HTTP/2")
+                #endif
 				do {
 					let expectedResult = "Read \(payload.characters.count) bytes"
 					var data = Data()
@@ -93,8 +97,12 @@ class LargePayloadTests: KituraHTTP2Test {
 	private func largeGet(secured: Bool) {
 		performServerTest(delegate, useSSL: secured, asyncTasks: { expectation in
 			self.performRequest("post", path: "/largepost", callback: { response in
-				XCTAssertEqual(response?.statusCode, HTTPStatusCode.OK, "Status code wasn't .Ok was \(String(describing: response?.statusCode))")
-				XCTAssertEqual(response?.httpVersionMajor, 2, "Used HTTP/\(String(describing: response?.httpVersionMajor)) instead of HTTP/2")
+                XCTAssertEqual(response?.statusCode, HTTPStatusCode.OK, "Status code wasn't .Ok was \(String(describing: response?.statusCode))")
+                #if os(Linux)
+                    XCTAssertEqual(response?.httpVersionMajor, 2, "Used HTTP/\(String(describing: response?.httpVersionMajor)) instead of HTTP/2")
+                #else
+                    secured ? XCTAssertEqual(response?.httpVersionMajor, 1, "Should have used HTTP/1.1"): XCTAssertEqual(response?.httpVersionMajor, 2, "Used HTTP/\(String(describing: response?.httpVersionMajor)) instead of HTTP/2")
+                #endif
 				expectation.fulfill()
 			})
 		})

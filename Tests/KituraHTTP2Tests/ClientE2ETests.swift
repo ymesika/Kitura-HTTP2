@@ -60,8 +60,13 @@ class ClientE2ETests: KituraHTTP2Test {
                 catch {
                     XCTFail("Failed reading the body of the response")
                 }
-                XCTAssertEqual(response?.httpVersionMajor, 2, "HTTP Major code from KituraNet should be 2, was \(String(describing: response?.httpVersionMajor))")
-                XCTAssertEqual(response?.httpVersionMinor, 0, "HTTP Minor code from KituraNet should be 0, was \(String(describing: response?.httpVersionMinor))")
+                #if os(Linux)
+                    XCTAssertEqual(response?.httpVersionMajor, 2, "HTTP Major code from KituraNet should be 2, was \(String(describing: response?.httpVersionMajor))")
+                    XCTAssertEqual(response?.httpVersionMinor, 0, "HTTP Minor code from KituraNet should be 0, was \(String(describing: response?.httpVersionMinor))")
+                #else
+                    XCTAssertEqual(response?.httpVersionMajor, 1, "HTTP Major code from KituraNet should be 1, was \(String(describing: response?.httpVersionMajor))")
+                    XCTAssertEqual(response?.httpVersionMinor, 1, "HTTP Minor code from KituraNet should be 1, was \(String(describing: response?.httpVersionMinor))")
+                #endif
                 expectation.fulfill()
             })
         }
@@ -278,8 +283,13 @@ class ClientE2ETests: KituraHTTP2Test {
     class TestURLDelegate: ServerDelegate {
         
         func handle(request: ServerRequest, response: ServerResponse) {
-            XCTAssertEqual(request.httpVersionMajor, 2, "HTTP Major code should be 2, was \(String(describing: request.httpVersionMajor))")
-            XCTAssertEqual(request.httpVersionMinor, 0, "HTTP Minor code should be 0, was \(String(describing: request.httpVersionMinor))")
+            #if os(Linux)
+                XCTAssertEqual(request.httpVersionMajor, 2, "HTTP Major code should be 2, was \(String(describing: request.httpVersionMajor))")
+                XCTAssertEqual(request.httpVersionMinor, 0, "HTTP Minor code should be 0, was \(String(describing: request.httpVersionMinor))")
+            #else
+                XCTAssertEqual(request.httpVersionMajor, 1, "HTTP Major code should be 1, was \(String(describing: request.httpVersionMajor))")
+                XCTAssertEqual(request.httpVersionMinor, 1, "HTTP Minor code should be 1, was \(String(describing: request.httpVersionMinor))")
+            #endif
             XCTAssertEqual(request.urlURL.path, urlPath, "Path in request.urlURL wasn't \(urlPath), it was \(request.urlURL.path)")
             XCTAssertEqual(request.urlURL.port, KituraHTTP2Test.portDefault)
             XCTAssertEqual(request.url, urlPath.data(using: .utf8))
