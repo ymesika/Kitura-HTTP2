@@ -18,12 +18,12 @@ matrix:
     - os: linux
       dist: trusty
       sudo: required
-#    - os: osx
-#      osx_image: xcode8.2
-#      sudo: required
+    - os: osx
+      osx_image: xcode8.2
+      sudo: required
 
 before_install:
-  - ./build.sh
+  - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then ./build.sh ; fi
   - git clone https://github.com/IBM-Swift/Package-Builder.git
 
 script:
