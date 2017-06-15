@@ -22,12 +22,12 @@ This package will also add to your server the support for using HTTP/2 protocol 
 ## Prerequisites:
 **OpenSSL v1.0.2** and above is required as ALPN is supported only in these versions.
 
-Currently **only Linux** is supported due to limitations of `SecuredTransport` on MacOS.  
-Specifically MacOS's SecuredTransport does not expose access to the [ALPN TLS extension](https://www.rfc-editor.org/rfc/rfc7301.txt). Once this limitation is removed we will add support for MacOS too.
+Currently **only Linux** is supported due to limitations of `SecureTransport` on MacOS.  
+Specifically MacOS's SecureTransport does not expose access to the [ALPN TLS extension](https://www.rfc-editor.org/rfc/rfc7301.txt). Once this limitation is removed we will add support for MacOS too.
 
 ## Usage:
 
-1. **Import `KituraHTTP2`:**
+1. **Import KituraHTTP2:**
 
   ```swift
   import KituraHTTP2
@@ -48,7 +48,7 @@ The tests will tests HTTP/2 functionality only on Linux using Curl that has the 
        libevent-dev libjansson-dev libjemalloc-dev cython python-setuptools build-essential
      ```
   2. Build nghttp2 from source:
-     ```shell
+     ```bash
      wget https://github.com/nghttp2/nghttp2/releases/download/v1.23.1/nghttp2-1.23.1.tar.bz2
      tar -xjf nghttp2-1.23.1.tar.bz2
      cd nghttp2-1.23.1
