@@ -30,11 +30,11 @@ Specifically MacOS's SecuredTransport does not expose access to the [ALPN TLS ex
   import KituraHTTP2
   ```
 
-2. **Enable HTTP/2 in your `Router` or any `ServerDelegate`:**
+2. **Enable HTTP/2:**
   ```swift
   HTTP2.using(serverDelegate: myRouter)
   ```
-
+  where `myRouter` is your _Router_ instance or any instance of _ServerDelegate_.
 
 
 ## Community
